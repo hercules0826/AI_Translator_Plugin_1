@@ -1,0 +1,121 @@
+# =======================================
+# JUCE Project Gitignore
+# =======================================
+
+# Build artifacts
+build/
+Builds/
+*/Builds/
+*/CMakeFiles/
+CMakeFiles/
+CMakeCache.txt
+CMakeScripts/
+cmake_install.cmake
+Makefile
+
+# JUCE auto-generated project files
+JuceLibraryCode/
+JuceLibraryCode/*
+*.jucer
+*.cmake
+*.cbp
+*.xcworkspace
+*.xcuserstate
+*.xcodeproj/*
+*.vs/
+*.VC.db
+*.VC.opendb
+*.VC.db-shm
+*.VC.db-wal
+
+# Visual Studio intermediate files
+*.obj
+*.pdb
+*.idb
+*.ipch
+*.aps
+*.ncb
+*.suo
+*.user
+*.sdf
+*.cachefile
+*.opendb
+*.tlog
+*.VC.db
+*.VC.opendb
+*.VC.VC.opendb
+*.log
+*.tmp
+
+# Generated binaries (plugins & apps)
+*.exe
+*.dll
+*.vst3
+*.aaxplugin
+*.component
+*.dylib
+*.so
+*.o
+*.lib
+*.exp
+*.pdb
+*.app
+*.pkg
+*.msi
+
+# Temporary & local files
+*.DS_Store
+*.bak
+*.swp
+*.swo
+*.tmp
+*.log
+*.orig
+*.old
+*.out
+*.dat
+*.json.lock
+*.zip
+*.tar
+*.gz
+*.7z
+
+# User-specific IDE configs
+.vscode/
+.idea/
+*.iml
+*.sublime-project
+*.sublime-workspace
+*.CLion*
+
+# Platform caches
+.DS_Store
+Thumbs.db
+ehthumbs.db
+*.stackdump
+*.lnk
+
+# =======================================
+# Optional: JUCE module caching
+# =======================================
+# Uncomment if you’re using a global JUCE path
+# C:/JUCE/
+# ~/JUCE/
+# ../../JUCE/
+
+# =======================================
+# Audio test & export files
+# =======================================
+*.wav
+*.aiff
+*.mp3
+*.flac
+*.ogg
+
+# =======================================
+# Environment & local build scripts
+# =======================================
+.env
+*.bat
+*.sh
+*.cmd
