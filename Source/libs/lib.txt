@@ -1,0 +1,9 @@
+sentencepiece_train.lib;sentencepiece.lib;ctranslate2.lib;cpu_features.lib;openblas.lib;onnxruntime_common.lib;onnxruntime_framework.lib;onnxruntime_graph.lib;onnxruntime_mlas.lib;onnxruntime_optimizer.lib;onnxruntime_providers.lib;onnxruntime_session.lib;onnxruntime_test_utils.lib;onnxruntime_util.lib;onnxruntime_flatbuffers.lib;onnx.lib;onnx_proto.lib;onnx_test_data_proto.lib;onnx_test_runner_common.lib
+
+
+absl_base.lib;absl_hash.lib;absl_malloc_internal.lib;absl_raw_hash_set.lib;absl_raw_logging_internal.lib;absl_strings.lib;absl_synchronization.lib;libprotobuf.lib;libprotobuf-lite.lib
+
+re2.lib;libprotobuf.lib;libprotobuf-lite.lib;libprotoc.lib;absl_base.lib;absl_hash.lib;absl_raw_hash_set.lib;absl_strings.lib;absl_examine_stack.lib;absl_flags_config.lib;absl_flags_reflection.lib;absl_log_severity.lib;absl_malloc_internal.lib;absl_raw_logging_internal.lib;absl_spinlock_wait.lib;absl_stacktrace.lib;absl_symbolize.lib;absl_synchronization.lib;absl_time.lib;absl_time_zone.lib
+
+
+dnnl.lib;ruy_allocator.lib;ruy_apply_multiplier.lib;ruy_block_map.lib;ruy_blocking_counter.lib;ruy_context.lib;ruy_context_get_ctx.lib;ruy_cpuinfo.lib;ruy_ctx.lib;ruy_denormal.lib;ruy_frontend.lib;ruy_have_built_path_for_avx.lib;ruy_have_built_path_for_avx2.lib;ruy_have_built_path_for_avx2_fma.lib;ruy_have_built_path_for_avx512.lib;ruy_kernel_arm.lib;ruy_kernel_avx.lib;ruy_kernel_avx2.lib;ruy_kernel_avx2_fma.lib;ruy_kernel_avx512.lib;ruy_pack_arm.lib;ruy_pack_avx.lib;ruy_pack_avx2.lib;ruy_pack_avx2_fma.lib;ruy_pack_avx512.lib;ruy_prepacked_cache.lib;ruy_prepare_packed_matrices.lib;ruy_system_aligned_alloc.lib;ruy_thread_pool.lib;ruy_trmul.lib;ruy_tune.lib;ruy_wait.lib;cpuinfo.lib;clog.lib;ruy_kernel_avx2.lib;ruy_pack_avx2.lib
