@@ -1,9 +1,15 @@
-﻿#include "WhisperEngine.h"
+#include "WhisperEngine.h"
 #include <juce_dsp/juce_dsp.h>
 
 // Include whisper.cpp C API
 extern "C" {
 #include <whisper.h>
+}
+
+static void logMsg(const std::function<void(const juce::String&)>& log,
+    const juce::String& s)
+{
+    if (log) log(s);
 }
 
 WhisperEngine::WhisperEngine() {}
@@ -13,106 +19,75 @@ WhisperEngine::~WhisperEngine()
 }
 
 bool WhisperEngine::loadModel(const juce::File& modelFile,
-    std::function<void(const juce::String&)> logCb)
+    std::function<void(const juce::String&)> logFn)
 {
     if (!modelFile.existsAsFile())
     {
-        if (logCb) logCb("[Whisper] Model not found: " + modelFile.getFullPathName());
+        logMsg(logFn, "[Whisper] Model not found: " + modelFile.getFullPathName());
         return false;
     }
 
-    // Free old model
     if (ctx != nullptr)
     {
         whisper_free(ctx);
         ctx = nullptr;
     }
 
-    if (logCb) logCb("[Whisper] Loading model: " + modelFile.getFileName());
-
     whisper_context_params cparams = whisper_context_default_params();
-    cparams.use_gpu = false;  // Safe default
+    cparams.use_gpu = false;
 
-    ctx = whisper_init_from_file_with_params(modelFile.getFullPathName().toRawUTF8(), cparams);
-    if (ctx == nullptr)
+    ctx = whisper_init_from_file_with_params(modelFile.getFullPathName().toRawUTF8(),
+        cparams);
+    if (!ctx)
     {
-        if (logCb) logCb("[Whisper] Failed to load Whisper model");
+        logMsg(logFn, "[Whisper] Failed to load model");
         return false;
     }
 
-    modelPath = modelFile;
-
-    if (logCb) logCb("[Whisper] Model loaded successfully");
+    logMsg(logFn, "[Whisper] Model loaded: " + modelFile.getFileName());
     return true;
 }
 
-//
-// Force resample to exactly 16 kHz
-//
-juce::AudioBuffer<float> WhisperEngine::resampleTo16k(const juce::AudioBuffer<float>& in, double inRate,
-    std::function<void(const juce::String&)> logCb)
+juce::AudioBuffer<float> WhisperEngine::resampleTo16k(
+    const juce::AudioBuffer<float>& in,
+    double inRate,
+    std::function<void(const juce::String&)>& logCb)
 {
-    constexpr double target = 16000.0;
+    constexpr double targetRate = 16000.0;
 
-    const int inSamples = in.getNumSamples();
-    if (inSamples <= 0)
+    if (in.getNumChannels() != 1 || inRate <= 0.0 || in.getNumSamples() <= 0)
     {
-        if (logCb) logCb("[Whisper] Empty input buffer for resample");
+        logMsg(logCb, "[Whisper] resampleTo16k: invalid input");
         return {};
     }
 
-    // Mixdown to mono
-    juce::AudioBuffer<float> mono(1, inSamples);
-    mono.clear();
-    for (int ch = 0; ch < in.getNumChannels(); ++ch)
-        mono.addFrom(0, 0, in, ch, 0, in.getNumSamples(), 1.0f / in.getNumChannels());
+    if (std::abs(inRate - targetRate) < 1.0)
+        return in; // already close enough
 
-    // Normalize amplitude
-    float peak = mono.getMagnitude(0, mono.getNumSamples());
-    if (peak > 0.0f)
-        mono.applyGain(0.8f / peak);
-
-    if (std::abs(inRate - target) < 1.0)
-    {
-        if (logCb) logCb("[Whisper] Input already 16kHz");
-        return mono;
-    }
-
-    const double ratio = target / inRate;  // 8k → 16k = 2.0, 48k → 16k ≈ 0.3333
-    const int outSamples = (int)std::ceil(mono.getNumSamples() * ratio);
-
-    if (logCb)
-    {
-        logCb("[Whisper] Resampling: " +
-            juce::String(inRate) + " Hz → 16000 Hz, ratio = " + juce::String(ratio, 4));
-        logCb("[Whisper] Input samples: " + juce::String(inSamples) +
-            " → Output samples: " + juce::String(outSamples));
-    }
+    const int inSamples = in.getNumSamples();
+    const double ratio = targetRate / inRate;
+    const int outSamples = (int)std::ceil(inSamples * ratio) + 8;
 
     juce::AudioBuffer<float> out(1, outSamples);
     out.clear();
 
-    //// --- High-quality resampling (better than Lagrange for large rate differences)
-    //juce::dsp::ResamplingAudioSource resampler(nullptr, false, 1);
-    //juce::AudioSourceChannelInfo info(&out, 0, outSamples);
-
-    //juce::AudioBuffer<float> temp(in);
-    //juce::AudioSourceChannelInfo inputInfo(&temp, 0, inSamples);
-
-    //juce::dsp::AudioBlock<float> block(temp);
-    //juce::dsp::ProcessContextReplacing<float> ctx(block);
-
-
     juce::LagrangeInterpolator interp;
-    interp.reset();
-    int produced = interp.process(ratio,
-        mono.getReadPointer(0),
+    const int produced = interp.process((float)ratio,
+        in.getReadPointer(0),
         out.getWritePointer(0),
-        mono.getNumSamples());
+        inSamples);
 
-    if (logCb)
-        logCb("[Whisper] Resample produced " + juce::String(produced) + " samples");
+    if (produced <= 0)
+    {
+        logMsg(logCb, "[Whisper] Resample produced 0 samples");
+        return {};
+    }
 
+    if (produced < outSamples)
+        out.setSize(1, produced, true, true, true);
+
+    logMsg(logCb, "[Whisper] Resampled " + juce::String(inRate, 2) +
+        " Hz -> 16kHz, " + juce::String(produced) + " samples");
     return out;
 }
 
@@ -121,60 +96,35 @@ juce::String WhisperEngine::transcribe(const juce::AudioBuffer<float>& monoIn,
     std::function<void(double)> progressCb,
     std::function<void(const juce::String&)> logCb)
 {
-    if (ctx == nullptr)
+    if (!ctx)
     {
-        if (logCb) logCb("[Whisper] No model loaded.");
+        logMsg(logCb, "[Whisper] No model loaded");
         return {};
     }
 
-    if (monoIn.getNumChannels() != 1)
+    if (monoIn.getNumChannels() != 1 || monoIn.getNumSamples() <= 0)
     {
-        if (logCb) logCb("[Whisper] Buffer is not mono");
+        logMsg(logCb, "[Whisper] Expected non-empty mono buffer");
         return {};
     }
 
-    if (monoIn.getNumSamples() == 0)
-    {
-        if (logCb) logCb("[Whisper] Buffer is empty");
+    auto mono16 = resampleTo16k(monoIn, sampleRate,
+        const_cast<std::function<void(const juce::String&)>&>(logCb));
+    if (mono16.getNumSamples() <= 0)
         return {};
-    }
 
-    // 1) FORCE RESAMPLE TO 16K
-    //juce::AudioBuffer<float> mono16k = resampleTo16k(monoIn, sampleRate, logCb);
-    juce::AudioBuffer<float> mono16k = monoIn;
-    if (mono16k.getNumSamples() == 0)
-    {
-        if (logCb) logCb("[Whisper] Resample failed");
-        return {};
-    }
+    const int nSamples = mono16.getNumSamples();
+    std::vector<float> pcm(nSamples);
+    std::memcpy(pcm.data(), mono16.getReadPointer(0), sizeof(float) * (size_t)nSamples);
 
-    const int nSamples = mono16k.getNumSamples();
-
-    if (logCb)
-    {
-        logCb("[Whisper] Running inference on " +
-            juce::String(nSamples) + " samples @ 16000 Hz");
-    }
-
-    // 2) Copy to vector<float> (required by whisper.cpp)
-    std::vector<float> pcm;
-    pcm.assign(mono16k.getReadPointer(0),
-        mono16k.getReadPointer(0) + nSamples);
-
-    if (progressCb) progressCb(0.05);
-
-    // 3) Configure whisper params
     whisper_full_params wparams = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
-
-    wparams.print_realtime = false;
     wparams.print_progress = false;
+    wparams.print_realtime = false;
     wparams.print_timestamps = false;
-
-    wparams.language = "auto";
     wparams.translate = false;
+    wparams.language = "auto";
     wparams.n_threads = juce::jmax(1, juce::SystemStats::getNumCpus() - 1);
 
-    // Forward progress from Whisper to UI
     wparams.progress_callback = [](whisper_context*, whisper_state*, int progress, void* user_data)
         {
             auto* cb = reinterpret_cast<std::function<void(double)>*>(user_data);
@@ -183,35 +133,28 @@ juce::String WhisperEngine::transcribe(const juce::AudioBuffer<float>& monoIn,
         };
     wparams.progress_callback_user_data = &progressCb;
 
-    // 4) Run whisper
-    int rc = whisper_full(ctx, wparams, pcm.data(), pcm.size());
+    if (progressCb) progressCb(0.02);
+
+    const int rc = whisper_full(ctx, wparams, pcm.data(), pcm.size());
     if (rc != 0)
     {
-        if (logCb) logCb("[Whisper] whisper_full failed: " + juce::String(rc));
+        logMsg(logCb, "[Whisper] whisper_full failed: " + juce::String(rc));
         if (progressCb) progressCb(0.0);
         return {};
     }
 
     if (progressCb) progressCb(1.0);
 
-    // 5) Extract output text
-    juce::String out;
+    juce::String transcript;
     const int nSegments = whisper_full_n_segments(ctx);
-
-    for (int i = 0; i < nSegments; i++)
+    for (int i = 0; i < nSegments; ++i)
     {
-        out += whisper_full_get_segment_text(ctx, i);
+        transcript += whisper_full_get_segment_text(ctx, i);
         if (i + 1 < nSegments)
-            out += " ";
+            transcript += " ";
     }
 
-    out = out.trim();
-
-    if (logCb)
-    {
-        logCb("[Whisper] Done. Segments = " + juce::String(nSegments));
-        logCb("[Whisper] Transcript = " + out);
-    }
-
-    return out;
+    transcript = transcript.trim();
+    logMsg(logCb, "[Whisper] Transcript: " + transcript);
+    return transcript;
 }

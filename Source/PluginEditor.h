@@ -1,38 +1,44 @@
+﻿// Source/PluginEditor.h
 #pragma once
+
 #include <juce_gui_extra/juce_gui_extra.h>
 #include "PluginProcessor.h"
 
 class WhisperFreeWinAudioProcessorEditor : public juce::AudioProcessorEditor,
-    private juce::Button::Listener
+    public juce::Button::Listener
 {
 public:
     explicit WhisperFreeWinAudioProcessorEditor(WhisperFreeWinAudioProcessor&);
-    ~WhisperFreeWinAudioProcessorEditor() override;
+    ~WhisperFreeWinAudioProcessorEditor() override = default;
 
     void paint(juce::Graphics&) override;
     void resized() override;
+    void buttonClicked(juce::Button*) override;
 
 private:
     WhisperFreeWinAudioProcessor& processor;
 
-    juce::TextButton loadBtn{ "Load WAV file..." };
-    juce::TextButton playBtn{ "Play" };
-    juce::TextButton stopBtn{ "Stop" };
-    juce::TextButton loadModelBtn{ "Load Model..." };
-    juce::TextButton sendBtn{ "Transcribe" };
+    juce::TextButton loadWavButton{ "Load WAV..." };
+    juce::TextButton playButton{ "Play" };
+    juce::TextButton stopButton{ "Stop" };
+    juce::TextButton sendButton{ "Send to Whisper" };
+    juce::TextButton loadWhisperBtn{ "Load Whisper Model..." };
+    juce::TextButton loadMarianBtn{ "Load Marian Model Folder..." };
 
-    juce::Label transcriptLabel;
-    juce::TextEditor logConsole;   // scrolling console
-    juce::ProgressBar progressBar{ progressValue };
+    juce::ToggleButton autoTranslateToggle{ "Auto translate (de→en)" };
+
+    juce::TextEditor logBox;
+    juce::TextEditor transcriptBox;
+    juce::TextEditor translationBox;
+
     double progressValue = 0.0;
+    juce::ProgressBar progressBar;
 
-    std::unique_ptr<juce::FileChooser> chooser;
-
-    void appendLogUI(const juce::String& s);
-    void showTranscript(const juce::String& t);
+    void appendLog(const juce::String& s);
+    void setTranscript(const juce::String& s);
+    void setTranslation(const juce::String& s);
     void setProgress(double p);
-
-    void buttonClicked(juce::Button* b) override;
+    std::unique_ptr<juce::FileChooser> chooser;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(WhisperFreeWinAudioProcessorEditor)
 };

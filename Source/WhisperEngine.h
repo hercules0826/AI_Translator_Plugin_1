@@ -28,12 +28,14 @@ public:
 
     bool isReady() const { return ctx != nullptr; }
     juce::File getModelPath() const { return modelPath; }
-    juce::AudioBuffer<float> resampleTo16k(const juce::AudioBuffer<float>& in, double inRate,
-        std::function<void(const juce::String&)> logCb);
 
 private:
     whisper_context* ctx = nullptr;
     juce::File modelPath;
+
+    juce::AudioBuffer<float> resampleTo16k(const juce::AudioBuffer<float>& in,
+        double inRate,
+        std::function<void(const juce::String&)>& logCb);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(WhisperEngine)
 };

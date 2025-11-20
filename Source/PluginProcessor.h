@@ -1,8 +1,10 @@
+// Source/PluginProcessor.h
 #pragma once
+
 #include <juce_audio_processors/juce_audio_processors.h>
-#include <juce_audio_formats/juce_audio_formats.h>
-#include "WhisperThread.h"
 #include "WhisperEngine.h"
+#include "TranslationEngine.h"
+#include "WhisperThread.h"
 #include <juce_audio_devices/sources/juce_AudioTransportSource.h>
 
 class WhisperFreeWinAudioProcessor : public juce::AudioProcessor
@@ -11,72 +13,69 @@ public:
     WhisperFreeWinAudioProcessor();
     ~WhisperFreeWinAudioProcessor() override;
 
-    const juce::String getName() const override { return "WhisperFreeWin"; }
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
-    void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
+    void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 
-    bool hasEditor() const override { return true; }
     juce::AudioProcessorEditor* createEditor() override;
-    //==============================================================================
+    bool hasEditor() const override { return true; }
+
+    const juce::String getName() const override { return "WhisperFreeWin"; }
     bool acceptsMidi() const override { return false; }
     bool producesMidi() const override { return false; }
-    bool isMidiEffect() const override { return false; }
     double getTailLengthSeconds() const override { return 0.0; }
 
-    // Program handling (JUCE requires these even if unused)
     int getNumPrograms() override { return 1; }
     int getCurrentProgram() override { return 0; }
     void setCurrentProgram(int) override {}
     const juce::String getProgramName(int) override { return {}; }
     void changeProgramName(int, const juce::String&) override {}
 
-    // State persistence
     void getStateInformation(juce::MemoryBlock&) override {}
     void setStateInformation(const void*, int) override {}
 
-    // ===== UI hooks
-    void setLogSink(std::function<void(const juce::String&)> sink) { logSink = std::move(sink); }
-    void setTranscriptSink(std::function<void(const juce::String&)> sink) { transcriptSink = std::move(sink); }
-    void setProgressSink(std::function<void(double)> sink) { progressSink = std::move(sink); }
-    void appendLog(const juce::String& s);
-    void onTranscript(const juce::String& t);
-    void onProgress(double p) { if (progressSink) juce::MessageManager::callAsync([sink = progressSink, p] { sink(p); });}
+    // UI sinks
+    void setLogSink(std::function<void(const juce::String&)> s) { logSink = std::move(s); }
+    void setTranscriptSink(std::function<void(const juce::String&)> s) { transcriptSink = std::move(s); }
+    void setTranslationSink(std::function<void(const juce::String&)> s) { translationSink = std::move(s); }
+    void setProgressSink(std::function<void(double)> s) { progressSink = std::move(s); }
 
-    // ===== WAV loading + playback
+    // Actions from UI
     bool loadWavFile(const juce::File& file);
-    void play();
-    void stop();
-    bool isPlaying() const { return transport.isPlaying(); }
+    void startPlayback();
+    void stopPlayback();
 
-    // Whisper
-    bool loadModel(const juce::File& modelFile)
-    {
-        return engine.loadModel(modelFile, [this](const juce::String& s) { appendLog(s); });
-    }
+    bool loadWhisperModel(const juce::File& modelFile);
+    bool loadMarianModel(const juce::File& folder);
+    bool sendLoadedBufferToWhisper();
 
-    // ===== Whisper send (NEW)
-    bool sendLoadedBufferToWhisper();        // <— expose clean call
-    bool hasLoadedAudio() const { return loadedMono.getNumSamples() > 0 && loadedSampleRate > 0.0; }
-
-    // Access
-    WhisperThread* getWhisper() { return whisperThread.get(); }
-    double getLoadedSampleRate() const { return loadedSampleRate; }
+    void setAutoTranslate(bool b) { autoTranslate = b; }
 
 private:
+    void appendLog(const juce::String& s);
+    void handleTranscript(const juce::String& t);
+    void handleTranslation(const juce::String& t);
+    void handleProgress(double p);
+
     juce::AudioFormatManager formatManager;
     std::unique_ptr<juce::AudioFormatReaderSource> readerSource;
     juce::AudioTransportSource transport;
 
-    WhisperEngine engine;
+    juce::AudioBuffer<float> loadedMono;
+    double loadedSampleRate = 48000.0;
+
+    WhisperEngine      whisperEngine;
+    TranslationEngine  translationEngine;
     std::unique_ptr<WhisperThread> whisperThread;
+
     std::function<void(const juce::String&)> logSink;
     std::function<void(const juce::String&)> transcriptSink;
-    std::function<void(double)> progressSink;
+    std::function<void(const juce::String&)> translationSink;
+    std::function<void(double)>              progressSink;
 
-    juce::AudioBuffer<float> loadedMono;  // cached mono copy for upload
-    double loadedSampleRate = 0.0;
+    bool autoTranslate = false;
+    bool marianLoaded = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(WhisperFreeWinAudioProcessor)
 };
